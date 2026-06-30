@@ -1053,7 +1053,7 @@ function generarQR(containerId, texto, size) {
   const s = size || 150;
   // Extract libro ID (first part before |)
   const libroId = texto.split('|')[0];
-  const url = 'https://control-libros-raga-v15.vercel.app?libro=' + libroId;
+  const url = 'https://seguimiento-libros-societarios-d3yp.vercel.app?libro=' + libroId;
   const encoded = encodeURIComponent(url);
   cont.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=' + s + 'x' + s + '&data=' + encoded + '" style="border:1px solid #E2DDD6;border-radius:10px;padding:8px;background:#fff;" />';
 }
