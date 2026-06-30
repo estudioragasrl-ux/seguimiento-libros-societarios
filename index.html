@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Seguimiento Libros Societarios</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet">
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<style>
+  :root {
+    --bg: #F4F1EC;
+    --surface: #FDFBF8;
+    --border: #E2DDD6;
+    --text: #1C1917;
+    --text2: #78716C;
+    --accent: #1D3A5F;
+    --accent2: #C8A96E;
+    --green: #2D6A4F;
+    --green-bg: #D8F3DC;
+    --red: #9B2226;
+    --red-bg: #FFE0E0;
+    --amber: #B45309;
+    --amber-bg: #FEF3C7;
+    --font: 'DM Sans', sans-serif;
+    --font-display: 'DM Serif Display', serif;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; }
+
+  .app-header { background: var(--accent); color: #fff; padding: 16px 20px 12px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  .app-header h1 { font-family: var(--font-display); font-size: 20px; font-weight: 400; }
+  .app-header p { font-size: 11px; opacity: 0.65; margin-top: 2px; font-weight: 300; }
+
+  .tabs-bar { background: var(--accent); display: flex; padding: 0 16px; border-top: 1px solid rgba(255,255,255,0.1); overflow-x: auto; }
+  .tab-btn { padding: 10px 14px; border: none; background: transparent; color: rgba(255,255,255,0.55); font-family: var(--font); font-size: 12px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.02em; }
+  .tab-btn.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+  .content { padding: 16px; max-width: 600px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* LOADING */
+  .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(29,58,95,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 999; color: #fff; gap: 14px; }
+  .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2); border-top-color: var(--accent2); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-overlay p { font-size: 14px; opacity: 0.85; }
+
+  /* STATS */
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 12px; text-align: center; box-shadow: var(--shadow); }
+  .stat-n { font-family: var(--font-display); font-size: 30px; color: var(--accent); line-height: 1; }
+  .stat-n.verde { color: var(--green); }
+  .stat-n.rojo { color: var(--red); }
+  .stat-lbl { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+  /* SEARCH */
+  .search-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .search-row input, .search-row select { flex: 1; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-family: var(--font); font-size: 13px; background: var(--surface); color: var(--text); outline: none; }
+  .search-row input:focus, .search-row select:focus { border-color: var(--accent); }
+  .search-row select { flex: 0 0 130px; }
+
+  /* CARDS */
+  .libro-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; box-shadow: var(--shadow); overflow: hidden; }
+  .libro-main { display: flex; align-items: flex-start; padding: 14px; gap: 12px; }
+  .libro-icon { width: 40px; height: 40px; background: var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .libro-info { flex: 1; min-width: 0; }
+  .libro-empresa { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .libro-tipo { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .libro-btns { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; margin-top: 6px; }
+  .badge-verde { background: var(--green-bg); color: var(--green); }
+  .badge-rojo { background: var(--red-bg); color: var(--red); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber); }
+
+  /* BUTTONS */
+  .btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--font); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .btn:hover { background: var(--bg); }
+  .btn-accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-accent:hover { background: #162d4a; }
+  .btn-gold { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+  .btn-gold:hover { background: #b8942e; }
+  .btn-danger { background: var(--red); border-color: var(--red); color: #fff; }
+  .btn-green { background: var(--green); border-color: var(--green); color: #fff; }
+  .btn-sm { padding: 5px 10px; font-size: 11px; }
+  .btn-full { width: 100%; display: block; text-align: center; padding: 11px; }
+
+  /* DETAIL */
+  .libro-detail { border-top: 1px solid var(--border); padding: 12px 14px; background: var(--bg); display: none; }
+  .libro-detail.open { display: block; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .detail-item .lbl { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }
+  .detail-item .val { font-size: 12px; margin-top: 2px; }
+
+  /* FORM */
+  .form-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow); }
+  .form-section h3 { font-family: var(--font-display); font-size: 16px; font-weight: 400; margin-bottom: 14px; color: var(--accent); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .fg { display: flex; flex-direction: column; gap: 4px; }
+  .pass-wrap { position: relative; }
+  .pass-wrap input { width: 100%; padding-right: 38px !important; }
+  .pass-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 16px; user-select: none; opacity: 0.6; }
+  .pass-toggle:hover { opacity: 1; }
+  .fg.full { grid-column: 1 / -1; }
+  .fg label { font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; }
+  .fg input, .fg select, .fg textarea { padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: var(--font); font-size: 13px; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s; }
+  .fg input:focus, .fg select:focus, .fg textarea:focus { border-color: var(--accent); background: #fff; }
+  .fg textarea { resize: vertical; min-height: 70px; }
+  .btn-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+  /* SCANNER */
+  .scanner-area { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 14px; }
+  .scanner-area h3 { font-family: var(--font-display); font-size: 16px; font-weight: 400; color: var(--accent); margin-bottom: 4px; }
+  .scanner-area p { font-size: 12px; color: var(--text2); margin-bottom: 14px; }
+  .scan-box { border: 2px dashed var(--border); border-radius: var(--radius); padding: 28px 20px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 12px; }
+  .scan-box:hover { border-color: var(--accent); background: #E8EFF7; }
+  .scan-box .icon { font-size: 36px; margin-bottom: 8px; }
+  .scan-box p { font-size: 13px; font-weight: 500; }
+  .scan-box span { font-size: 11px; color: var(--text2); }
+  #qr-reader { border-radius: var(--radius); overflow: hidden; margin-bottom: 10px; }
+  #qr-reader img { display: none !important; }
+  .manual-row { display: flex; gap: 8px; }
+  .manual-row input { flex: 1; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: var(--font); font-size: 13px; background: var(--bg); color: var(--text); outline: none; }
+  .scan-result-card { border-radius: var(--radius); padding: 14px; margin-top: 14px; }
+  .scan-ok { background: var(--green-bg); border: 1px solid #95D5B2; }
+  .scan-err { background: var(--red-bg); border: 1px solid #FFA8A8; }
+  .scan-ok h4 { color: var(--green); font-size: 13px; margin-bottom: 6px; }
+  .scan-err h4 { color: var(--red); font-size: 13px; }
+
+  /* MOVIMIENTOS */
+  .mov-card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 8px; }
+  .mov-card.ingreso { border-left-color: var(--green); }
+  .mov-empresa { font-weight: 600; font-size: 13px; }
+  .mov-detalle { font-size: 12px; color: var(--text2); margin-top: 3px; }
+  .mov-fecha { font-size: 11px; color: var(--text2); margin-top: 5px; }
+  .mov-tipo-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 20px; margin-top: 5px; }
+  .pill-salida { background: var(--red-bg); color: var(--red); }
+  .pill-ingreso { background: var(--green-bg); color: var(--green); }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; padding: 16px; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: var(--surface); border-radius: 16px; padding: 22px; width: 100%; max-width: 460px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal-box h2 { font-family: var(--font-display); font-size: 20px; font-weight: 400; color: var(--accent); margin-bottom: 14px; }
+  .modal-info { background: var(--bg); border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 12px; }
+  .modal-info strong { font-size: 13px; }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+  .qr-box { text-align: center; padding: 10px 0; }
+  .qr-box canvas { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: #fff; }
+  .qr-code-txt { font-family: monospace; font-size: 13px; color: var(--text2); margin-top: 8px; }
+
+  .empty { text-align: center; padding: 50px 20px; color: var(--text2); }
+  .empty-icon { font-size: 44px; margin-bottom: 12px; }
+  .empty p { font-size: 14px; margin-bottom: 4px; }
+  .empty small { font-size: 12px; }
+
+  .qr-result-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-top: 14px; text-align: center; box-shadow: var(--shadow); }
+  .qr-result-card h3 { color: var(--green); font-size: 15px; margin-bottom: 4px; }
+  .qr-result-card p { font-size: 12px; color: var(--text2); margin-bottom: 12px; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+
+
+  /* LOGIN */
+  .login-screen {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999; padding: 20px;
+  }
+  .login-box {
+    background: var(--surface); border-radius: 20px; padding: 36px 28px;
+    width: 100%; max-width: 380px; text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .login-box .logo { font-size: 48px; margin-bottom: 12px; }
+  .login-box h2 { font-family: var(--font-display); font-size: 22px; font-weight: 400; color: var(--accent); margin-bottom: 4px; }
+  .login-box p { font-size: 12px; color: var(--text2); margin-bottom: 24px; }
+  .login-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; text-align: left; }
+  .login-field label { font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; }
+  .login-field input {
+    width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+    border-radius: 10px; font-family: var(--font); font-size: 14px;
+    background: var(--bg); color: var(--text); outline: none;
+  }
+  .login-field input:focus { border-color: var(--accent); }
+  .login-btn {
+    width: 100%; padding: 12px; background: var(--accent); color: #fff;
+    border: none; border-radius: 10px; font-family: var(--font); font-size: 14px;
+    font-weight: 500; cursor: pointer; margin-top: 6px;
+  }
+  .login-btn:hover { background: #162d4a; }
+  .login-error { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
+
+  /* CAMBIAR CLAVE MODAL */
+  .cambiar-clave-btn {
+    background: none; border: none; color: var(--accent2); font-size: 12px;
+    cursor: pointer; font-family: var(--font); text-decoration: underline;
+    margin-top: 10px; display: block; width: 100%; text-align: center;
+  }
+
+  /* USER BADGE en header */
+  .user-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.15); border-radius: 20px;
+    padding: 4px 12px; font-size: 12px; color: #fff; cursor: pointer;
+  }
+  .user-badge:hover { background: rgba(255,255,255,0.25); }
+  .header-row { display: flex; align-items: center; justify-content: space-between; }
+
+  .admin-user-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 0.5px solid var(--border); font-size: 13px;
+  }
+  .admin-user-row:last-child { border-bottom: none; }
+  .admin-user-info { flex: 1; }
+  .admin-user-name { font-weight: 500; }
+  .admin-user-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .admin-badge { font-size: 10px; background: var(--amber-bg); color: var(--amber); padding: 2px 6px; border-radius: 10px; margin-left: 6px; }
+
+  @media (max-width: 400px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .fg.full { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="login-screen">
+  <div class="login-box">
+    <div class="logo">📚</div>
+    <h2>Seguimiento Libros Societarios</h2>
+    <p>RAGA S.R.L — Ingresá con tu usuario</p>
+    <div class="login-field">
+      <label>Usuario</label>
+      <input type="text" id="login-user" placeholder="Ej: andgue" onkeydown="if(event.key==='Enter') document.getElementById('login-pass').focus()" autocomplete="username" />
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <div class="pass-wrap">
+        <input type="password" id="login-pass" placeholder="Tu contraseña" onkeydown="if(event.key==='Enter') checkLogin()" autocomplete="current-password" />
+        <span class="pass-toggle" onclick="togglePass('login-pass', this)">👁️</span>
+      </div>
+    </div>
+    <button class="login-btn" onclick="checkLogin()">Ingresar</button>
+    <div class="login-error" id="login-error">Usuario o contraseña incorrectos.</div>
+    <button class="cambiar-clave-btn" onclick="mostrarCambiarClave(false)">¿Querés cambiar tu contraseña?</button>
+    <button class="cambiar-clave-btn" style="color:var(--text2);margin-top:4px;" onclick="recuperarClave()">¿Olvidaste tu contraseña?</button>
+  </div>
+</div>
+
+<div id="loading-overlay" class="loading-overlay">
+  <div class="spinner"></div>
+  <p>Cargando datos...</p>
+</div>
+
+<div class="app-header">
+  <div class="header-row">
+    <div>
+      <h1>📚 Seguimiento Libros Societarios</h1>
+      <p id="fecha-header"></p>
+    </div>
+    <div style="position:relative;">
+      <div id="user-badge" class="user-badge" style="display:none;cursor:pointer;" onclick="toggleUserMenu()">
+        <span>👤</span><span id="user-badge-name"></span><span style="font-size:10px;margin-left:4px;">▾</span>
+      </div>
+      <div id="user-menu" style="display:none;position:absolute;right:0;top:36px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.15);min-width:180px;z-index:500;overflow:hidden;">
+        <button onclick="mostrarCambiarClave(false);toggleUserMenu()" style="width:100%;padding:12px 16px;border:none;background:none;font-family:var(--font);font-size:13px;text-align:left;cursor:pointer;color:var(--text);">🔑 Cambiar contraseña</button>
+        <hr style="margin:0;border:none;border-top:1px solid var(--border);">
+        <button onclick="cerrarSesion()" style="width:100%;padding:12px 16px;border:none;background:none;font-family:var(--font);font-size:13px;text-align:left;cursor:pointer;color:var(--red);">🚪 Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs-bar">
+  <button class="tab-btn active" onclick="switchTab('libros', this)">Libros</button>
+  <button class="tab-btn" onclick="switchTab('scanner', this)">Escanear</button>
+  <button class="tab-btn" onclick="switchTab('movimientos', this)">Movimientos</button>
+  <button class="tab-btn" onclick="switchTab('nuevo', this)">+ Nuevo</button>
+  <button class="tab-btn" id="tab-btn-admin" style="display:none;" onclick="switchTab('admin', this)">⚙️ Admin</button>
+</div>
+
+<div class="content">
+
+  <!-- LIBROS -->
+  <div id="tab-libros" class="section active">
+    <div class="stats-row" style="margin-top:16px;">
+      <div class="stat-box"><div class="stat-n" id="st-total">—</div><div class="stat-lbl">Total libros</div></div>
+      <div class="stat-box"><div class="stat-n verde" id="st-estudio">—</div><div class="stat-lbl">En estudio</div></div>
+      <div class="stat-box"><div class="stat-n rojo" id="st-entregado">—</div><div class="stat-lbl">Entregados</div></div>
+    </div>
+    <div class="search-row">
+      <input type="text" id="search-q" placeholder="🔍 Buscar empresa o tipo..." oninput="renderLibros()" />
+      <select id="filter-estado" onchange="renderLibros()">
+        <option value="">Todos</option>
+        <option value="en-estudio">En estudio</option>
+        <option value="entregado">Entregado</option>
+        <option value="en-tramite">En trámite</option>
+      </select>
+    </div>
+    <div id="lista-libros"></div>
+  </div>
+
+  <!-- SCANNER -->
+  <div id="tab-scanner" class="section">
+    <div style="height:16px;"></div>
+    <div class="scanner-area">
+      <h3>Escanear QR</h3>
+      <p>Activá la cámara o ingresá el código manualmente para registrar un movimiento.</p>
+      <div class="scan-box" onclick="startScanner()">
+        <div class="icon">📷</div>
+        <p>Tocar para activar la cámara</p>
+        <span>Apuntá al código QR del libro</span>
+      </div>
+      <div id="qr-reader" style="display:none;"></div>
+      <button id="btn-stop" class="btn btn-danger btn-full" style="display:none;margin-bottom:10px;" onclick="stopScanner()">⏹ Detener cámara</button>
+      <div class="manual-row">
+        <input type="text" id="cod-manual" placeholder="Código manual (ej: LIB-001)" />
+        <button class="btn btn-accent" onclick="buscarManual()">Buscar</button>
+      </div>
+      <div id="scan-result"></div>
+    </div>
+  </div>
+
+  <!-- MOVIMIENTOS -->
+  <div id="tab-movimientos" class="section">
+    <div style="height:16px;"></div>
+    <div class="search-row">
+      <input type="text" id="search-mov" placeholder="🔍 Buscar por empresa..." oninput="renderMovimientos()" />
+      <select id="filter-mov-tipo" onchange="renderMovimientos()" style="flex:0 0 160px;">
+        <option value="">Todos</option>
+        <option value="salida">📤 Salidas</option>
+        <option value="ingreso">📥 Ingresos</option>
+        <option value="a-tramite">⧗ Va a trámite</option>
+        <option value="vuelve-tramite">↩️ Vuelve de trámite</option>
+      </select>
+    </div>
+    <div id="lista-movimientos"></div>
+  </div>
+
+  <!-- NUEVO LIBRO -->
+  <div id="tab-nuevo" class="section">
+    <div style="height:16px;"></div>
+    <div class="form-section">
+      <h3>Registrar nuevo libro</h3>
+      <div class="form-grid">
+        <div class="fg full"><label>Empresa *</label><input type="text" id="n-empresa" placeholder="Ej: Polo Bodega y Viñedos S.A." /></div>
+        <div class="fg full"><label>Tipo de documentación *</label><input type="text" id="n-tipo" placeholder="Ej: Libro de Registro de Accionistas" /></div>
+        <div class="fg"><label>Número</label><input type="text" id="n-num" placeholder="Ej: Nº1" /></div>
+        <div class="fg"><label>Estado inicial</label>
+          <select id="n-estado">
+            <option value="en-estudio">En estudio</option>
+            <option value="entregado">Entregado al cliente</option>
+            <option value="en-tramite">En trámite</option>
+          </select>
+        </div>
+        <div class="fg full"><label>Observaciones</label><textarea id="n-obs" placeholder="Observaciones opcionales..."></textarea></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-accent" onclick="guardarLibro()">💾 Guardar y generar QR</button>
+        <button class="btn" onclick="limpiarForm()">Limpiar</button>
+      </div>
+    </div>
+    <div id="nuevo-qr" style="display:none;"></div>
+  </div>
+
+  <!-- ADMIN -->
+  <div id="tab-admin" class="section">
+    <div style="height:16px;"></div>
+    <div class="form-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <h3 style="margin-bottom:0;">Gestión de usuarios</h3>
+        <button class="btn btn-accent btn-sm" onclick="mostrarNuevoUsuario()">+ Nuevo usuario</button>
+      </div>
+      <div id="admin-usuarios-lista"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL MOVIMIENTO -->
+<div id="modal-mov" class="modal-overlay">
+  <div class="modal-box">
+    <h2>Registrar movimiento</h2>
+    <div class="modal-info" id="modal-libro-info"></div>
+    <div class="form-grid">
+      <div class="fg full">
+        <label>Tipo *</label>
+        <select id="mov-tipo" onchange="actualizarCamposMov()">
+          <option value="salida">📤 Salida — el cliente retira</option>
+          <option value="ingreso">📥 Ingreso — el cliente devuelve</option>
+          <option value="a-tramite">⧗ Va a trámite (ej: librería)</option>
+          <option value="vuelve-tramite">↩️ Vuelve de trámite</option>
+        </select>
+      </div>
+      <div class="fg full" id="campo-persona-label">
+        <label id="label-persona">Nombre y apellido de quien retira *</label>
+        <input type="text" id="mov-persona" placeholder="Ej: Héctor Zicarelli" />
+      </div>
+      <div class="fg full" id="campo-mail" style="display:block;">
+        <label>Mail del cliente (para acuse de recibo)</label>
+        <input type="email" id="mov-mail" placeholder="Ej: cliente@mail.com" />
+      </div>
+      <div class="fg full">
+        <label>Observaciones</label>
+        <input type="text" id="mov-destino" placeholder="Ej: trámite AFIP, P/ Valeria..." />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="cerrarModal('modal-mov')">Cancelar</button>
+      <button class="btn btn-accent" id="btn-guardar-mov" onclick="guardarMovimiento()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR LIBRO -->
+<div id="modal-editar-libro" class="modal-overlay">
+  <div class="modal-box">
+    <h2>Modificar libro</h2>
+    <input type="hidden" id="edit-lib-id" />
+    <div class="form-grid">
+      <div class="fg full"><label>Empresa *</label><input type="text" id="edit-lib-empresa" /></div>
+      <div class="fg full"><label>Tipo de libro *</label><input type="text" id="edit-lib-tipo" /></div>
+      <div class="fg"><label>Número</label><input type="text" id="edit-lib-numero" /></div>
+      <div class="fg"><label>Estado</label>
+        <select id="edit-lib-estado">
+          <option value="en-estudio">En estudio</option>
+          <option value="entregado">Entregado</option>
+          <option value="en-tramite">En trámite</option>
+        </select>
+      </div>
+      <div class="fg full"><label>Observaciones</label><textarea id="edit-lib-obs" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="cerrarModal('modal-editar-libro')">Cancelar</button>
+      <button class="btn btn-accent" onclick="guardarEdicionLibro()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL QR -->
+<div id="modal-qr" class="modal-overlay">
+  <div class="modal-box" style="max-width:320px;">
+    <h2 id="qr-modal-titulo" style="text-align:center;"></h2>
+    <p id="qr-modal-subtitulo" style="text-align:center;font-size:12px;color:var(--text2);margin-top:-8px;margin-bottom:14px;"></p>
+    <div class="qr-box"><div id="qr-modal-canvas"></div><div class="qr-code-txt" id="qr-modal-codigo"></div></div>
+    <p style="font-size:11px;color:var(--text2);text-align:center;margin-top:12px;">Imprimí este QR y pegalo en el lomo del libro.</p>
+    <button class="btn btn-full" style="margin-top:12px;" onclick="cerrarModal('modal-qr')">Cerrar</button>
+  </div>
+</div>
+
+
+<!-- MODAL NUEVO USUARIO -->
+<div id="modal-nuevo-usuario" class="modal-overlay">
+  <div class="modal-box" style="max-width:400px;">
+    <h2>Nuevo usuario</h2>
+    <div class="form-grid">
+      <div class="fg full"><label>Nombre completo *</label><input type="text" id="nuevo-u-nombre" placeholder="Ej: Juan Perez" /></div>
+      <div class="fg full"><label>Usuario *</label><input type="text" id="nuevo-u-usuario" placeholder="Ej: juanpe" /></div>
+      <div class="fg full"><label>Contraseña inicial *</label><input type="text" id="nuevo-u-clave" placeholder="Ej: JPeez2026" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="cerrarModal('modal-nuevo-usuario')">Cancelar</button>
+      <button class="btn btn-accent" onclick="guardarNuevoUsuario()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR USUARIO -->
+<div id="modal-editar-usuario" class="modal-overlay">
+  <div class="modal-box" style="max-width:400px;">
+    <h2>Editar usuario</h2>
+    <input type="hidden" id="edit-u-id" />
+    <div class="form-grid">
+      <div class="fg full"><label>Nombre completo</label><input type="text" id="edit-u-nombre" disabled style="opacity:0.6;" /></div>
+      <div class="fg full"><label>Usuario</label><input type="text" id="edit-u-usuario" disabled style="opacity:0.6;" /></div>
+      <div class="fg full"><label>Nueva contraseña (dejá vacío para no cambiar)</label><div class="pass-wrap"><input type="password" id="edit-u-clave" placeholder="Nueva contraseña" /><span class="pass-toggle" onclick="togglePass('edit-u-clave', this)">👁️</span></div></div>
+    </div>
+    <p style="font-size:11px;color:var(--text2);margin-top:8px;">También podés resetear la clave a la inicial:</p>
+    <button class="btn btn-sm" style="margin-top:4px;" onclick="resetearClave(document.getElementById('edit-u-id').value);cerrarModal('modal-editar-usuario');">Resetear a clave inicial</button>
+    <div class="modal-footer">
+      <button class="btn" onclick="cerrarModal('modal-editar-usuario')">Cancelar</button>
+      <button class="btn btn-accent" onclick="guardarEdicionUsuario()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CAMBIAR CLAVE -->
+<div id="modal-cambiar-clave" class="modal-overlay">
+  <div class="modal-box" style="max-width:380px;">
+    <h2 id="cambiar-clave-titulo">Cambiar contraseña</h2>
+    <div id="cambiar-clave-aviso" style="background:var(--amber-bg);border:1px solid var(--amber);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--amber);margin-bottom:14px;display:none;">
+      ⚠️ Estás usando la contraseña inicial. Por seguridad, cambiala antes de continuar.
+    </div>
+    <p id="cambiar-clave-usuario" style="font-size:13px;color:var(--text2);margin-bottom:14px;"></p>
+    <div class="form-grid">
+      <div class="fg full"><label>Contraseña actual</label><div class="pass-wrap"><input type="password" id="clave-actual" placeholder="Tu contraseña actual" /><span class="pass-toggle" onclick="togglePass('clave-actual', this)">👁️</span></div></div>
+      <div class="fg full"><label>Nueva contraseña</label><div class="pass-wrap"><input type="password" id="clave-nueva" placeholder="Nueva contraseña (mín. 6 caracteres)" /><span class="pass-toggle" onclick="togglePass('clave-nueva', this)">👁️</span></div></div>
+      <div class="fg full"><label>Confirmar nueva contraseña</label><div class="pass-wrap"><input type="password" id="clave-confirmar" placeholder="Repetí la nueva contraseña" /><span class="pass-toggle" onclick="togglePass('clave-confirmar', this)">👁️</span></div></div>
+    </div>
+    <div id="cambiar-clave-error" style="color:var(--red);font-size:12px;margin-top:8px;display:none;"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="cerrarModal('modal-cambiar-clave')">Cancelar</button>
+      <button class="btn btn-accent" onclick="guardarNuevaClave()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbxTrdA6y0g606nsjk6FWwdIyClcBXTBpi_Dnlabo8p55Id2x8re86KuGUEZx2Wj4pB_/exec';
+
+let libros = [];
+let movimientos = [];
+let libroActivoId = null;
+let qrScanner = null;
+
+
+const USUARIOS_BASE = [
+  {usuario:"andgue", claveInicial:"AGuerrero2026", nombre:"Andrea Guerrero", admin:false},
+  {usuario:"elifab", claveInicial:"EFabio2026", nombre:"Elio Di Fabio", admin:false},
+  {usuario:"felmoy", claveInicial:"FMoyano2026", nombre:"Felipe Moyano", admin:false},
+  {usuario:"miggal", claveInicial:"MGallardo2026", nombre:"Miguel Gallardo", admin:false},
+  {usuario:"melfab", claveInicial:"MFabio2026", nombre:"Melisa Di Fabio", admin:false},
+  {usuario:"sangom", claveInicial:"SGomez2026", nombre:"Sandra Gomez", admin:false},
+  {usuario:"alecos", claveInicial:"ACosta2026", nombre:"Alejandro Costa", admin:false},
+  {usuario:"gralam", claveInicial:"GLamagrande2026", nombre:"Graciela Lamagrande", admin:true},
+  {usuario:"laubai", claveInicial:"LBaigorria2026", nombre:"Laura Baigorria", admin:false},
+  {usuario:"dierod", claveInicial:"DRodriguez2026", nombre:"Diego Rodriguez", admin:false},
+  {usuario:"adrsar", claveInicial:"ASartorio2026", nombre:"Adrian Sartorio", admin:false},
+  {usuario:"felvit", claveInicial:"FVita2026", nombre:"Felix De Vita", admin:false},
+  {usuario:"frasan", claveInicial:"FSantaolaya2026", nombre:"Franco Santaolaya", admin:false},
+  {usuario:"lauger", claveInicial:"LGervasi2026", nombre:"Laura Gervasi", admin:false},
+  {usuario:"marmar", claveInicial:"MMartinez2026", nombre:"Marisa Martinez", admin:false},
+  {usuario:"micher", claveInicial:"MHerrera2026", nombre:"Micaela Herrera", admin:false},
+  {usuario:"silver", claveInicial:"SVerbauwede2026", nombre:"Silvana Verbauwede", admin:false},
+  {usuario:"fedgil", claveInicial:"FGil2026", nombre:"Federico Gil", admin:false},
+  {usuario:"agonog", claveInicial:"ANoguera2026", nombre:"Agostina Noguera", admin:false},
+  {usuario:"brigar", claveInicial:"BGarro2026", nombre:"Brian Garro", admin:false},
+  {usuario:"breria", claveInicial:"BRiarte2026", nombre:"Brenda Riarte", admin:false},
+  {usuario:"ferper", claveInicial:"FPereyra2026", nombre:"Fernando Pereyra", admin:false},
+  {usuario:"juacuc", claveInicial:"JCucchi2026", nombre:"Juan Cucchi", admin:false},
+  {usuario:"juaped", claveInicial:"JPedernera2026", nombre:"Juan Jose Pedernera", admin:false},
+  {usuario:"marter", claveInicial:"MTereso2026", nombre:"Marina Tereso", admin:false},
+  {usuario:"fabalv", claveInicial:"FAlvarez2026", nombre:"Fabian Alvarez", admin:false},
+  {usuario:"agudia", claveInicial:"ADiaz2026", nombre:"Agustina Diaz", admin:false},
+  {usuario:"carazc", claveInicial:"CAzcarate2026", nombre:"Carla Azcarate", admin:false},
+  {usuario:"daibat", claveInicial:"DBataglia2026", nombre:"Daiana Bataglia", admin:false},
+  {usuario:"fabrom", claveInicial:"FRomera2026", nombre:"Fabian Romera", admin:false},
+  {usuario:"flosae", claveInicial:"FSaenz2026", nombre:"Florencia Saenz", admin:false},
+  {usuario:"matoyo", claveInicial:"MOyola2026", nombre:"Matias Oyola", admin:false},
+  {usuario:"solcan", claveInicial:"SCaniu2026", nombre:"Soledad Caniu", admin:false},
+  {usuario:"viccar", claveInicial:"VCarretero2026", nombre:"Victoria Carretero", admin:false},
+  {usuario:"silcor", claveInicial:"SCorbellini2026", nombre:"Silvana Corbellini", admin:false},
+  {usuario:"agusta", claveInicial:"AStaurino2026", nombre:"Agustin Staurino", admin:false},
+  {usuario:"alenog", claveInicial:"ANoguera2026", nombre:"Alejandra Noguera", admin:false},
+  {usuario:"laulin", claveInicial:"LLino2026", nombre:"Laureana Lino", admin:false},
+  {usuario:"maxped", claveInicial:"MPedro2026", nombre:"Maxi De Pedro", admin:false},
+  {usuario:"maxmoy", claveInicial:"MMoyano2026", nombre:"Maxi Moyano", admin:false},
+  {usuario:"noegil", claveInicial:"NGili2026", nombre:"Noelia Gili", admin:false},
+];
+
+
+// ===== USUARIO SYSTEM =====
+let usuarioActual = null;
+
+function getUsuarios() {
+  // Start with base list, then merge any admin-added users
+  const extra = JSON.parse(localStorage.getItem('usuarios_extra') || '[]');
+  return [...USUARIOS_BASE, ...extra];
+}
+
+function getClaves() {
+  return JSON.parse(localStorage.getItem('claves_usuarios') || '{}');
+}
+
+function getClave(usuario) {
+  const claves = getClaves();
+  if (claves[usuario]) return claves[usuario];
+  const u = getUsuarios().find(x => x.usuario === usuario);
+  return u ? u.claveInicial : null;
+}
+
+function isClaveInicial(usuario) {
+  const claves = getClaves();
+  if (claves[usuario]) return false; // already changed
+  return true;
+}
+
+function togglePass(id, span) {
+  const input = document.getElementById(id);
+  if (input.type === 'password') {
+    input.type = 'text';
+    span.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    span.textContent = '👁️';
+  }
+}
+
+// ===== LOGIN =====
+async function checkLogin() {
+  const user = document.getElementById('login-user').value.trim().toLowerCase();
+  const pass = document.getElementById('login-pass').value;
+  const errDiv = document.getElementById('login-error');
+  const btnLogin = document.querySelector('.login-btn');
+  errDiv.style.display = 'none';
+  btnLogin.textContent = 'Verificando...';
+  btnLogin.disabled = true;
+
+  try {
+    // Obtener claves desde Google Sheets
+    const clavesRemote = await apiGet('getClaves');
+    // Actualizar localStorage con las claves remotas
+    localStorage.setItem('claves_usuarios', JSON.stringify(clavesRemote));
+
+    const claveCorrecta = getClave(user);
+    const u = getUsuarios().find(x => x.usuario === user);
+    const claveInicialU = u ? u.claveInicial : null;
+
+    if (u && (pass === claveCorrecta || pass === claveInicialU)) {
+      usuarioActual = u;
+      document.getElementById('login-screen').style.display = 'none';
+      sessionStorage.setItem('logueado', user);
+      document.getElementById('user-badge').style.display = 'flex';
+      document.getElementById('user-badge-name').textContent = usuarioActual.nombre;
+      if (usuarioActual.admin) {
+        document.getElementById('tab-btn-admin').style.display = 'block';
+      }
+      init();
+      if (isClaveInicial(user)) {
+        setTimeout(() => {
+          toast('⚠️ Estás usando tu clave inicial. Hacé clic en tu nombre para cambiarla.');
+        }, 1500);
+      }
+    } else {
+      errDiv.style.display = 'block';
+      errDiv.textContent = 'Usuario o contraseña incorrectos.';
+      document.getElementById('login-pass').value = '';
+      document.getElementById('login-pass').focus();
+    }
+  } catch(e) {
+    // Si falla la conexión, usar localStorage como fallback
+    const claveCorrecta = getClave(user);
+    const u = getUsuarios().find(x => x.usuario === user);
+    const claveInicialU = u ? u.claveInicial : null;
+    if (u && (pass === claveCorrecta || pass === claveInicialU)) {
+      usuarioActual = u;
+      document.getElementById('login-screen').style.display = 'none';
+      sessionStorage.setItem('logueado', user);
+      document.getElementById('user-badge').style.display = 'flex';
+      document.getElementById('user-badge-name').textContent = usuarioActual.nombre;
+      if (usuarioActual.admin) document.getElementById('tab-btn-admin').style.display = 'block';
+      init();
+    } else {
+      errDiv.style.display = 'block';
+      errDiv.textContent = 'Usuario o contraseña incorrectos.';
+      document.getElementById('login-pass').value = '';
+      document.getElementById('login-pass').focus();
+    }
+  } finally {
+    btnLogin.textContent = 'Ingresar';
+    btnLogin.disabled = false;
+  }
+}
+
+function mostrarCambiarClave(obligatorio) {
+  if (!usuarioActual) return;
+  const titulo = obligatorio ? 'Cambiar contraseña inicial' : 'Cambiar contraseña';
+  document.getElementById('cambiar-clave-titulo').textContent = titulo;
+  document.getElementById('cambiar-clave-aviso').style.display = obligatorio ? 'block' : 'none';
+  document.getElementById('cambiar-clave-usuario').textContent = 'Usuario: ' + usuarioActual.usuario + ' — ' + usuarioActual.nombre;
+  document.getElementById('clave-actual').value = '';
+  document.getElementById('clave-nueva').value = '';
+  document.getElementById('clave-confirmar').value = '';
+  document.getElementById('cambiar-clave-error').style.display = 'none';
+  document.getElementById('modal-cambiar-clave').classList.add('open');
+}
+
+async function guardarNuevaClave() {
+  const actual = document.getElementById('clave-actual').value;
+  const nueva = document.getElementById('clave-nueva').value;
+  const confirmar = document.getElementById('clave-confirmar').value;
+  const errDiv = document.getElementById('cambiar-clave-error');
+  const claveActual = getClave(usuarioActual.usuario);
+  const u = getUsuarios().find(x => x.usuario === usuarioActual.usuario);
+  const claveInicialU = u ? u.claveInicial : null;
+  if (actual !== claveActual && actual !== claveInicialU) { errDiv.textContent = 'La contraseña actual es incorrecta.'; errDiv.style.display = 'block'; return; }
+  if (nueva.length < 6) { errDiv.textContent = 'La nueva contraseña debe tener al menos 6 caracteres.'; errDiv.style.display = 'block'; return; }
+  if (nueva !== confirmar) { errDiv.textContent = 'Las contraseñas no coinciden.'; errDiv.style.display = 'block'; return; }
+  
+  const btnGuardar = document.querySelector('#modal-cambiar-clave .btn-accent');
+  if (btnGuardar) { btnGuardar.disabled = true; btnGuardar.textContent = 'Guardando...'; }
+  
+  try {
+    await apiPost('saveClave', { usuario: usuarioActual.usuario, clave: nueva });
+    const claves = getClaves();
+    claves[usuarioActual.usuario] = nueva;
+    localStorage.setItem('claves_usuarios', JSON.stringify(claves));
+    cerrarModal('modal-cambiar-clave');
+    toast('✅ Contraseña cambiada correctamente');
+  } catch(e) {
+    errDiv.textContent = 'Error al guardar. Verificá tu conexión.';
+    errDiv.style.display = 'block';
+  } finally {
+    if (btnGuardar) { btnGuardar.disabled = false; btnGuardar.textContent = 'Guardar'; }
+  }
+}
+
+// Check if already logged in this session
+const sessionUser = sessionStorage.getItem('logueado');
+if (sessionUser) {
+  usuarioActual = getUsuarios().find(x => x.usuario === sessionUser);
+  if (usuarioActual) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('user-badge').style.display = 'flex';
+    document.getElementById('user-badge-name').textContent = usuarioActual.nombre;
+    if (usuarioActual.admin) {
+      document.getElementById('tab-btn-admin').style.display = 'block';
+    }
+    init(); // Load data on session restore
+  }
+}
+
+// ===== ADMIN - GESTIÓN DE USUARIOS =====
+function renderAdminUsuarios() {
+  const usuarios = getUsuarios();
+  const claves = getClaves();
+  const cont = document.getElementById('admin-usuarios-lista') || document.getElementById('lista-usuarios-admin');
+  if (!cont) return;
+  cont.innerHTML = usuarios.map(u => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <div>
+        <div style="font-weight:600;font-size:13px;">${u.nombre} ${u.admin ? '<span style="background:#FEF3C7;color:#B45309;font-size:10px;padding:2px 6px;border-radius:10px;font-weight:500;">Admin</span>' : ''}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px;">Usuario: <strong>${u.usuario}</strong> ${claves[u.usuario] ? '' : '— <span style="color:var(--amber)">clave inicial</span>'}</div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm" onclick="editarUsuario('${u.usuario}')">Editar</button>
+        <button class="btn btn-sm btn-warning" onclick="resetearClave('${u.usuario}')">Resetear clave</button>
+        ${u.usuario !== 'gralam' ? '<button class="btn btn-sm btn-danger" onclick="eliminarUsuario(\'' + u.usuario + '\')">Eliminar</button>' : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function editarUsuario(usuarioId) {
+  const u = getUsuarios().find(x => x.usuario === usuarioId);
+  if (!u) return;
+  document.getElementById('edit-u-id').value = u.usuario;
+  document.getElementById('edit-u-nombre').value = u.nombre;
+  document.getElementById('edit-u-usuario').value = u.usuario;
+  document.getElementById('edit-u-clave').value = '';
+  document.getElementById('modal-editar-usuario').classList.add('open');
+}
+
+function guardarEdicionUsuario() {
+  const id = document.getElementById('edit-u-id').value;
+  const nuevaClave = document.getElementById('edit-u-clave').value.trim();
+  if (nuevaClave) {
+    const claves = getClaves();
+    claves[id] = nuevaClave;
+    localStorage.setItem('claves_usuarios', JSON.stringify(claves));
+  }
+  cerrarModal('modal-editar-usuario');
+  renderAdminUsuarios();
+  toast('✅ Usuario actualizado');
+}
+
+async function resetearClave(usuarioId) {
+  if (!confirm('¿Resetear la clave de este usuario a la inicial?')) return;
+  const claves = getClaves();
+  delete claves[usuarioId];
+  localStorage.setItem('claves_usuarios', JSON.stringify(claves));
+  try {
+    await apiPost('deleteClave', { usuario: usuarioId });
+  } catch(e) {}
+  toast('✅ Clave reseteada a la inicial');
+  renderAdminUsuarios();
+}
+
+function eliminarUsuario(usuarioId) {
+  if (!confirm('¿Eliminar este usuario?')) return;
+  const extra = JSON.parse(localStorage.getItem('usuarios_extra') || '[]');
+  const nuevos = extra.filter(u => u.usuario !== usuarioId);
+  localStorage.setItem('usuarios_extra', JSON.stringify(nuevos));
+  renderAdminUsuarios();
+  toast('🗑 Usuario eliminado');
+}
+
+function mostrarNuevoUsuario() {
+  document.getElementById('nuevo-u-nombre').value = '';
+  document.getElementById('nuevo-u-usuario').value = '';
+  document.getElementById('nuevo-u-clave').value = '';
+  document.getElementById('modal-nuevo-usuario').classList.add('open');
+}
+
+function guardarNuevoUsuario() {
+  const nombre = document.getElementById('nuevo-u-nombre').value.trim();
+  const usuario = document.getElementById('nuevo-u-usuario').value.trim().toLowerCase();
+  const clave = document.getElementById('nuevo-u-clave').value.trim();
+  if (!nombre || !usuario || !clave) { alert('Todos los campos son obligatorios.'); return; }
+  const todos = getUsuarios();
+  if (todos.find(u => u.usuario === usuario)) { alert('Ese usuario ya existe.'); return; }
+  const extra = JSON.parse(localStorage.getItem('usuarios_extra') || '[]');
+  extra.push({usuario, claveInicial: clave, nombre, admin: false});
+  localStorage.setItem('usuarios_extra', JSON.stringify(extra));
+  cerrarModal('modal-nuevo-usuario');
+  renderAdminUsuarios();
+  toast('✅ Usuario creado correctamente');
+}
+
+// ===== UTILS =====
+function formatFecha(fechaStr) {
+  if (!fechaStr) return '';
+  if (fechaStr.includes('/')) return fechaStr;
+  try {
+    const d = new Date(fechaStr);
+    return d.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric'});
+  } catch(e) { return fechaStr; }
+}
+function hoy() { return new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric'}); }
+function hora() { return new Date().toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'}); }
+
+document.getElementById('fecha-header').textContent = new Date().toLocaleDateString('es-AR', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function showLoading(v) {
+  document.getElementById('loading-overlay').style.display = v ? 'flex' : 'none';
+}
+
+// ===== API CALLS =====
+async function apiGet(action) {
+  const res = await fetch(API + '?action=' + action);
+  return res.json();
+}
+
+async function apiPost(action, data) {
+  const res = await fetch(API + '?action=' + action, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+  return res.json();
+}
+
+// ===== LOAD DATA =====
+async function loadAll() {
+  showLoading(true);
+  try {
+    const [libs, movs, clavesRemote] = await Promise.all([
+      apiGet('getLibros'), 
+      apiGet('getMovimientos'),
+      apiGet('getClaves').catch(() => {})
+    ]);
+    libros = libs || [];
+    movimientos = movs || [];
+    // Merge remote claves with local
+    if (clavesRemote && !clavesRemote.error) {
+      const localClaves = getClaves();
+      const merged = Object.assign({}, clavesRemote, localClaves);
+      localStorage.setItem('claves_usuarios', JSON.stringify(merged));
+    }
+  } catch(e) {
+    alert('Error al conectar con Google Sheets. Verificá tu conexión a internet.');
+  }
+  showLoading(false);
+  renderLibros();
+  renderMovimientos();
+}
+
+// ===== TABS =====
+function switchTab(tab, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  btn.classList.add('active');
+  if (tab === 'admin') renderAdminUsuarios();
+}
+
+// ===== BADGE =====
+function badge(estado) {
+  if (estado === 'en-estudio') return '<span class="badge badge-verde">✓ En estudio</span>';
+  if (estado === 'entregado') return '<span class="badge badge-rojo">↗ Entregado</span>';
+  if (estado === 'en-tramite') return '<span class="badge badge-amber">⧗ En trámite</span>';
+  return '';
+}
+
+// ===== RENDER LIBROS =====
+function renderLibros() {
+  const q = (document.getElementById('search-q').value || '').toLowerCase();
+  const fe = document.getElementById('filter-estado').value;
+  let fil = libros.filter(l => {
+    const mb = !q || l.empresa.toLowerCase().includes(q) || l.tipo.toLowerCase().includes(q);
+    const me = !fe || l.estado === fe;
+    return mb && me;
+  });
+
+  document.getElementById('st-total').textContent = libros.length;
+  document.getElementById('st-estudio').textContent = libros.filter(l => l.estado === 'en-estudio').length;
+  document.getElementById('st-entregado').textContent = libros.filter(l => l.estado === 'entregado').length;
+
+  const cont = document.getElementById('lista-libros');
+  if (fil.length === 0) {
+    cont.innerHTML = `<div class="empty"><div class="empty-icon">📂</div><p>No hay libros registrados.</p><small>Usá "+ Nuevo" para agregar el primer libro.</small></div>`;
+    return;
+  }
+
+  cont.innerHTML = fil.map(l => {
+    const movs = movimientos.filter(m => m.libroId === l.id);
+    const last = movs.length ? movs[movs.length-1] : null;
+    return `
+    <div class="libro-card">
+      <div class="libro-main">
+        <div class="libro-icon">📗</div>
+        <div class="libro-info">
+          <div class="libro-empresa">${l.empresa}</div>
+          <div class="libro-tipo">${l.tipo}${l.numero ? ' ' + l.numero : ''}</div>
+          ${badge(l.estado)}
+        </div>
+        <div class="libro-btns">
+          <button class="btn btn-sm btn-gold" data-qr="${l.id}" onclick="verQR(this.dataset.qr)">QR</button>
+          <button class="btn btn-sm btn-accent" data-mov="${l.id}" onclick="abrirModalMov(this.dataset.mov)" style="font-size:18px;padding:4px 10px;">📋</button>
+          <button class="btn btn-sm" data-det="det-${l.id}" onclick="toggleDetalle(this.dataset.det)">▾</button>
+        </div>
+      </div>
+      <div class="libro-detail" id="det-${l.id}">
+        <div class="detail-grid">
+          <div class="detail-item"><div class="lbl">Código</div><div class="val">${l.id}</div></div>
+          <div class="detail-item"><div class="lbl">Registrado</div><div class="val">${formatFecha(l.fechaAlta)}</div></div>
+          ${l.obs ? `<div class="detail-item" style="grid-column:1/-1"><div class="lbl">Observaciones</div><div class="val">${l.obs}</div></div>` : ''}
+        </div>
+        ${last ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px;"><span style="color:var(--text2);">Último mov.:</span> ${last.tipo === 'salida' ? '📤' : '📥'} ${last.persona} — ${formatFecha(last.fecha)}</div>` : ''}
+        <div style="margin-top:10px;display:flex;gap:8px;">
+          ${usuarioActual && usuarioActual.usuario === 'gralam' ? `<button class="btn btn-sm" data-edit="${l.id}" onclick="abrirModalEditarLibro(this.dataset.edit)">✏️ Modificar</button>` : ''}
+          ${usuarioActual && usuarioActual.usuario === 'gralam' ? `<button class="btn btn-sm btn-danger" data-elim="${l.id}" onclick="eliminarLibro(this.dataset.elim)">🗑 Eliminar</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleDetalle(id) { document.getElementById(id).classList.toggle('open'); }
+
+// ===== RENDER MOVIMIENTOS =====
+function renderMovimientos() {
+  const cont = document.getElementById('lista-movimientos');
+  const searchEl = document.getElementById('search-mov');
+  const tipoEl = document.getElementById('filter-mov-tipo');
+  const q = searchEl ? searchEl.value.toLowerCase() : '';
+  const ft = tipoEl ? tipoEl.value : '';
+
+  let fil = [...movimientos].reverse().filter(m => {
+    const lib = libros.find(l => l.id === m.libroId);
+    const empresa = lib ? lib.empresa.toLowerCase() : '';
+    const matchQ = !q || empresa.includes(q);
+    const matchT = !ft || m.tipo === ft;
+    return matchQ && matchT;
+  });
+
+  if (fil.length === 0) {
+    cont.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><p>Sin movimientos${q ? ' para esa búsqueda' : ' aún'}.</p></div>`;
+    return;
+  }
+  cont.innerHTML = fil.map(m => {
+    const lib = libros.find(l => l.id === m.libroId);
+    const esIngreso = m.tipo === 'ingreso' || m.tipo === 'vuelve-tramite';
+    const pillTexto = m.tipo === 'salida' ? '📤 Salida' : m.tipo === 'ingreso' ? '📥 Ingreso' : m.tipo === 'a-tramite' ? '⧗ Va a trámite' : m.tipo === 'vuelve-tramite' ? '↩️ Vuelve de trámite' : m.tipo;
+    return `<div class="mov-card ${esIngreso ? 'ingreso' : ''}">
+      <div class="mov-empresa">${lib ? lib.empresa : m.libroId}</div>
+      <div class="mov-detalle">${lib ? lib.tipo + (lib.numero ? ' ' + lib.numero : '') : ''}</div>
+      <span class="mov-tipo-pill ${esIngreso ? 'pill-ingreso' : 'pill-salida'}">${pillTexto}</span>
+      <div class="mov-detalle" style="margin-top:4px;">👤 ${m.persona}${m.destino ? ' — ' + m.destino : ''}</div>
+      ${m.registradoPor ? `<div class="mov-detalle" style="margin-top:2px;">✏️ Registrado por: ${m.registradoPor}</div>` : ''}
+      <div class="mov-fecha">🕐 ${formatFecha(m.fecha)} ${m.hora}</div>
+      ${usuarioActual && usuarioActual.admin ? '<div style="margin-top:6px;"><button class="btn btn-sm btn-danger" onclick="eliminarMovimiento(\'' + m.id + '\')">Eliminar</button></div>' : ''}
+    </div>`;
+  }).join('');
+}
+
+// ===== GUARDAR LIBRO =====
+async function guardarLibro() {
+  const empresa = document.getElementById('n-empresa').value.trim();
+  const tipo = document.getElementById('n-tipo').value.trim();
+  if (!empresa || !tipo) { alert('Empresa y tipo son obligatorios.'); return; }
+
+  showLoading(true);
+  
+  // Recargar libros desde Sheets para obtener el conteo real y evitar IDs duplicados
+  try {
+    libros = await apiGet('getLibros');
+  } catch(e) {}
+  
+  // Generar ID único consultando los IDs existentes en Sheets para evitar duplicados
+  const idsExistentes = new Set(libros.map(l => l.id));
+  let num = libros.length + 1;
+  let id = 'LIB-' + String(num).padStart(3, '0');
+  while (idsExistentes.has(id)) {
+    num++;
+    id = 'LIB-' + String(num).padStart(3, '0');
+  }
+  const libro = {
+    id, empresa, tipo,
+    numero: document.getElementById('n-num').value.trim(),
+    estado: document.getElementById('n-estado').value,
+    obs: document.getElementById('n-obs').value.trim(),
+    fechaAlta: hoy()
+  };
+
+  try {
+    await apiPost('addLibro', libro);
+    libros.push(libro);
+    toast('✅ Libro guardado en Google Sheets');
+
+    const qrDiv = document.getElementById('nuevo-qr');
+    qrDiv.style.display = 'block';
+    qrDiv.innerHTML = `<div class="qr-result-card">
+      <h3>✅ Libro registrado — ${id}</h3>
+      <p>${empresa}<br>${tipo}</p>
+      <div id="nuevo-qr-canvas" style="display:flex;justify-content:center;margin:10px 0;"></div>
+      <p>Imprimí este QR y pegalo en el lomo del libro.</p>
+    </div>`;
+    setTimeout(() => generarQR('nuevo-qr-canvas', id + '|' + empresa + '|' + tipo, 160), 100);
+    limpiarForm();
+    renderLibros();
+  } catch(e) {
+    alert('Error al guardar. Verificá tu conexión.');
+  }
+  showLoading(false);
+}
+
+function limpiarForm() {
+  ['n-empresa','n-tipo','n-num','n-obs'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('n-estado').value = 'en-estudio';
+}
+
+// ===== QR =====
+function generarQR(containerId, texto, size) {
+  const cont = document.getElementById(containerId);
+  if (!cont) return;
+  const s = size || 150;
+  // Extract libro ID (first part before |)
+  const libroId = texto.split('|')[0];
+  const url = 'https://control-libros-raga-v15.vercel.app?libro=' + libroId;
+  const encoded = encodeURIComponent(url);
+  cont.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=' + s + 'x' + s + '&data=' + encoded + '" style="border:1px solid #E2DDD6;border-radius:10px;padding:8px;background:#fff;" />';
+}
+
+function verQR(id) {
+  const l = libros.find(x => x.id === id);
+  if (!l) return;
+  document.getElementById('qr-modal-titulo').textContent = l.empresa;
+  document.getElementById('qr-modal-subtitulo').textContent = l.tipo + (l.numero ? ' ' + l.numero : '');
+  document.getElementById('qr-modal-codigo').textContent = l.id;
+  document.getElementById('qr-modal-canvas').innerHTML = '';
+  document.getElementById('modal-qr').classList.add('open');
+  setTimeout(() => generarQR('qr-modal-canvas', l.id + '|' + l.empresa + '|' + l.tipo, 190), 100);
+}
+
+// ===== MODAL MOVIMIENTO =====
+function actualizarCamposMov() {
+  const tipo = document.getElementById('mov-tipo').value;
+  const labelPersona = document.getElementById('label-persona');
+  const campoMail = document.getElementById('campo-mail');
+  if (tipo === 'salida') {
+    labelPersona.textContent = 'Nombre y apellido de quien retira *';
+    campoMail.style.display = 'block';
+  } else if (tipo === 'ingreso') {
+    labelPersona.textContent = 'Nombre y apellido de quien devuelve *';
+    campoMail.style.display = 'none';
+  } else if (tipo === 'a-tramite') {
+    labelPersona.textContent = 'Quién lo lleva / a dónde (ej: librería) *';
+    campoMail.style.display = 'none';
+  } else if (tipo === 'vuelve-tramite') {
+    labelPersona.textContent = 'Quién lo trae de vuelta *';
+    campoMail.style.display = 'none';
+  }
+}
+
+function abrirModalMov(id) {
+  const l = libros.find(x => x.id === id);
+  if (!l) return;
+  libroActivoId = id;
+  document.getElementById('modal-libro-info').innerHTML = `<strong>${l.empresa}</strong><br><span style="color:var(--text2)">${l.tipo}${l.numero ? ' ' + l.numero : ''}</span><br><div style="margin-top:6px;">${badge(l.estado)}</div>`;
+  document.getElementById('mov-tipo').value = l.estado === 'entregado' ? 'ingreso' : (l.estado === 'en-tramite' ? 'vuelve-tramite' : 'salida');
+  document.getElementById('mov-persona').value = '';
+  document.getElementById('mov-destino').value = '';
+  document.getElementById('mov-mail').value = '';
+  actualizarCamposMov();
+  document.getElementById('modal-mov').classList.add('open');
+}
+
+function cerrarModal(id) {
+  document.getElementById(id).classList.remove('open');
+  if (id === 'modal-mov') libroActivoId = null;
+}
+
+async function guardarMovimiento() {
+  if (!libroActivoId) return;
+  const persona = document.getElementById('mov-persona').value.trim();
+  const destino = document.getElementById('mov-destino').value.trim();
+  const tipo = document.getElementById('mov-tipo').value;
+  if (!persona) { alert('El nombre y apellido es obligatorio.'); return; }
+  if (!destino) { alert('Las observaciones son obligatorias.'); return; }
+
+  const mov = {
+    id: String(Date.now()),
+    libroId: libroActivoId,
+    tipo, persona,
+    destino: destino,
+    registradoPor: usuarioActual ? usuarioActual.nombre : '',
+    fecha: hoy(),
+    hora: hora()
+  };
+
+  document.getElementById('btn-guardar-mov').disabled = true;
+  showLoading(true);
+
+  try {
+    const nuevoEstado = tipo === 'salida' ? 'entregado' : (tipo === 'a-tramite' ? 'en-tramite' : 'en-estudio');
+    await Promise.all([
+      apiPost('addMovimiento', mov),
+      apiPost('updateEstado', { id: libroActivoId, estado: nuevoEstado })
+    ]);
+    movimientos.push(mov);
+    const libro = libros.find(l => l.id === libroActivoId);
+    if (libro) libro.estado = nuevoEstado;
+    toast('✅ Movimiento registrado');
+    // Send email receipt if mail provided and it's a salida
+    if (tipo === 'salida') {
+      const mailCliente = document.getElementById('mov-mail').value.trim();
+      const libroData = libros.find(l => l.id === libroActivoId);
+      if (mailCliente && libroData) {
+        try {
+          await emailjs.send('service_xue3c19', 'template_vv717hq', {
+            email: mailCliente,
+            persona: persona,
+            empresa: libroData.empresa,
+            libro: libroData.tipo + (libroData.numero ? ' ' + libroData.numero : ''),
+            tipo: 'Salida — el cliente retiró el libro',
+            fecha: mov.fecha,
+            observacion: mov.destino
+          }, 'Q4SZw_trQeqwt2fUH');
+          toast('✅ Movimiento registrado y acuse enviado por mail');
+        } catch(mailErr) {
+          toast('✅ Movimiento registrado (el mail no se pudo enviar)');
+        }
+      }
+    }
+    cerrarModal('modal-mov');
+    renderLibros();
+    renderMovimientos();
+  } catch(e) {
+    alert('Error al guardar. Verificá tu conexión.');
+  }
+
+  document.getElementById('btn-guardar-mov').disabled = false;
+  showLoading(false);
+}
+
+// ===== ELIMINAR =====
+function abrirModalEditarLibro(id) {
+  const l = libros.find(x => x.id === id);
+  if (!l) return;
+  document.getElementById('edit-lib-id').value = l.id;
+  document.getElementById('edit-lib-empresa').value = l.empresa;
+  document.getElementById('edit-lib-tipo').value = l.tipo;
+  document.getElementById('edit-lib-numero').value = l.numero || '';
+  document.getElementById('edit-lib-estado').value = l.estado || 'en-estudio';
+  document.getElementById('edit-lib-obs').value = l.obs || '';
+  document.getElementById('modal-editar-libro').classList.add('open');
+}
+
+async function guardarEdicionLibro() {
+  const id = document.getElementById('edit-lib-id').value;
+  const empresa = document.getElementById('edit-lib-empresa').value.trim();
+  const tipo = document.getElementById('edit-lib-tipo').value.trim();
+  if (!empresa || !tipo) { alert('Empresa y tipo son obligatorios.'); return; }
+  const numero = document.getElementById('edit-lib-numero').value.trim();
+  const estado = document.getElementById('edit-lib-estado').value;
+  const obs = document.getElementById('edit-lib-obs').value.trim();
+
+  showLoading(true);
+  try {
+    await apiPost('editLibro', { id, empresa, tipo, numero, estado, obs });
+    const idx = libros.findIndex(l => l.id === id);
+    if (idx !== -1) {
+      libros[idx] = { ...libros[idx], empresa, tipo, numero, estado, obs };
+    }
+    cerrarModal('modal-editar-libro');
+    renderLibros();
+    toast('✅ Libro modificado correctamente');
+  } catch(e) {
+    alert('Error al modificar. Verificá tu conexión.');
+  }
+  showLoading(false);
+}
+
+async function eliminarLibro(id) {
+  if (!usuarioActual || !usuarioActual.admin) { alert('Solo el administrador puede eliminar libros.'); return; }
+  if (!confirm('¿Eliminar este libro y todos sus movimientos?')) return;
+  showLoading(true);
+  try {
+    await apiPost('deleteLibro', { id });
+    libros = libros.filter(l => l.id !== id);
+    movimientos = movimientos.filter(m => m.libroId !== id);
+    toast('🗑 Libro eliminado');
+    renderLibros();
+    renderMovimientos();
+  } catch(e) {
+    alert('Error al eliminar.');
+  }
+  showLoading(false);
+}
+
+// ===== SCANNER =====
+function startScanner() {
+  document.getElementById('qr-reader').style.display = 'block';
+  document.getElementById('btn-stop').style.display = 'block';
+  qrScanner = new Html5Qrcode("qr-reader");
+  qrScanner.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: { width: 240, height: 240 } },
+    (decoded) => { stopScanner(); procesarQR(decoded); },
+    () => {}
+  ).catch(() => {
+    alert('No se pudo acceder a la cámara. Usá el campo manual.');
+    document.getElementById('qr-reader').style.display = 'none';
+    document.getElementById('btn-stop').style.display = 'none';
+  });
+}
+
+function stopScanner() {
+  if (qrScanner) {
+    qrScanner.stop().then(() => {
+      document.getElementById('qr-reader').style.display = 'none';
+      document.getElementById('btn-stop').style.display = 'none';
+      qrScanner = null;
+    }).catch(() => {});
+  }
+}
+
+function buscarManual() {
+  const cod = document.getElementById('cod-manual').value.trim();
+  if (!cod) return;
+  procesarQR(cod);
+}
+
+function procesarQR(texto) {
+  // Extraer el ID del libro ya sea de una URL o del formato antiguo ID|empresa|tipo
+  let id = texto;
+  if (texto.includes('?libro=')) {
+    id = texto.split('?libro=')[1].split('&')[0];
+  } else if (texto.includes('|')) {
+    id = texto.split('|')[0];
+  }
+  const libro = libros.find(l => l.id === id);
+  const res = document.getElementById('scan-result');
+  if (!libro) {
+    res.innerHTML = `<div class="scan-result-card scan-err"><h4>❌ Libro no encontrado</h4><p style="font-size:12px;color:var(--red);margin-top:4px;">Código: ${id}</p></div>`;
+    return;
+  }
+  res.innerHTML = `<div class="scan-result-card scan-ok">
+    <h4>✅ Libro encontrado</h4>
+    <p style="font-weight:600;font-size:13px;color:var(--text)">${libro.empresa}</p>
+    <p style="font-size:12px;color:var(--text2)">${libro.tipo}${libro.numero ? ' ' + libro.numero : ''}</p>
+    <div style="margin:8px 0;">${badge(libro.estado)}</div>
+    <button class="btn btn-accent" style="margin-top:8px;" data-mov="${libro.id}" onclick="abrirModalMov(this.dataset.mov)">Registrar movimiento</button>
+  </div>`;
+}
+
+// ===== ADMIN =====
+function getUsuariosExtra() {
+  return JSON.parse(localStorage.getItem('usuarios_extra') || '[]');
+}
+
+function saveUsuariosExtra(lista) {
+  localStorage.setItem('usuarios_extra', JSON.stringify(lista));
+}
+
+function getTodosUsuarios() {
+  return [...USUARIOS, ...getUsuariosExtra()];
+}
+
+function agregarUsuario() {
+  const nombre = document.getElementById('adm-nombre').value.trim();
+  const usuario = document.getElementById('adm-usuario').value.trim().toLowerCase();
+  const clave = document.getElementById('adm-clave').value.trim();
+  if (!nombre || !usuario || !clave) { alert('Todos los campos son obligatorios.'); return; }
+  const todos = getTodosUsuarios();
+  if (todos.find(u => u.usuario === usuario)) { alert('Ese usuario ya existe.'); return; }
+  const extra = getUsuariosExtra();
+  extra.push({ usuario, clave, nombre });
+  saveUsuariosExtra(extra);
+  toast('✅ Usuario ' + usuario + ' agregado');
+  document.getElementById('adm-nombre').value = '';
+  document.getElementById('adm-usuario').value = '';
+  document.getElementById('adm-clave').value = '';
+  renderAdminUsuarios();
+}
+
+function eliminarUsuario(usuario) {
+  if (!confirm('¿Eliminar el usuario ' + usuario + '?')) return;
+  const extra = getUsuariosExtra().filter(u => u.usuario !== usuario);
+  saveUsuariosExtra(extra);
+  toast('🗑 Usuario eliminado');
+  renderAdminUsuarios();
+}
+
+async function eliminarMovimiento(id) {
+  if (!usuarioActual || !usuarioActual.admin) { alert('Solo el administrador puede eliminar movimientos.'); return; }
+  if (!confirm('¿Eliminar este movimiento?')) return;
+  showLoading(true);
+  try {
+    await apiPost('deleteMovimiento', { id });
+    movimientos = movimientos.filter(m => m.id !== id);
+    toast('🗑 Movimiento eliminado');
+    renderMovimientos();
+  } catch(e) { alert('Error al eliminar.'); }
+  showLoading(false);
+}
+
+function recuperarClave() {
+  const user = document.getElementById('login-user').value.trim().toLowerCase();
+  if (!user) {
+    alert('Primero ingresá tu usuario (ej: gralam) y luego hacé clic en "¿Olvidaste tu contraseña?"');
+    return;
+  }
+  const u = getUsuarios().find(x => x.usuario === user);
+  if (!u) {
+    alert('Usuario no encontrado. Verificá que escribiste bien tu usuario.');
+    return;
+  }
+  alert('Contactá a la administradora Graciela (gralam) para que resetee tu contraseña.\n\nTu usuario es: ' + user + '\nTu clave inicial era: ' + u.claveInicial);
+}
+
+function toggleUserMenu() {
+  const menu = document.getElementById('user-menu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  // Close when clicking outside
+  if (menu.style.display === 'block') {
+    setTimeout(() => {
+      document.addEventListener('click', function closeMenu(e) {
+        if (!document.getElementById('user-badge').contains(e.target)) {
+          menu.style.display = 'none';
+          document.removeEventListener('click', closeMenu);
+        }
+      });
+    }, 10);
+  }
+}
+
+function cerrarSesion() {
+  if (!confirm('¿Cerrar sesión?')) return;
+  sessionStorage.removeItem('logueado');
+  usuarioActual = null;
+  document.getElementById('user-badge').style.display = 'none';
+  document.getElementById('user-menu').style.display = 'none';
+  document.getElementById('tab-btn-admin').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').style.display = 'none';
+}
+
+// ===== INIT =====
+async function init() {
+  await loadAll();
+  // Check if opened via QR scan with ?libro=LIB-XXX
+  const params = new URLSearchParams(window.location.search);
+  const libroId = params.get('libro');
+  if (libroId) {
+    const libro = libros.find(l => l.id === libroId);
+    if (libro) {
+      // Show scan result on scanner tab
+      switchTab('scanner', document.querySelectorAll('.tab-btn')[1]);
+      procesarQR(libroId);
+    }
+  }
+}
+// init() is called after login
+emailjs.init('Q4SZw_trQeqwt2fUH');
+</script>
+</body>
+</html>
